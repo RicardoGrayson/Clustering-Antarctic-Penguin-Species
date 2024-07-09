@@ -62,7 +62,7 @@ EDA involved exploring the penguins data to answer key questions, such as:
 
 ### Data Analysis
 
-The data approximates a roughly normal distribution for its numerical columns, but there are two significant outliers for 'flipper_lenght_mm'. In addition, the scale of the 'body_mass_g' is vastly different from the other features and needs to be scaled so it doesn't affect the classification algorithm in the machine learning model disproportionately.
+The data approximates a roughly normal distribution for its numerical columns, but there are two significant outliers for 'flipper_length_mm'. In addition, the scale of the 'body_mass_g' is vastly different from the other features and needs to be scaled so it doesn't affect the classification algorithm in the machine learning model disproportionately.
 
 ```python
 fig,axes=plt.subplots(4,1,figsize=(10,15))
@@ -80,6 +80,22 @@ plt.xticks(rotation=45)
 ```
 ![image](https://github.com/RicardoGrayson/Clustering-Antarctic-Penguin-Species/assets/63846918/0cbf21a1-a4bd-41ef-9a44-9fc68bc3652b)
 
+Remove outliers and rows missing data
+
+```python
+#find Q1, Q3, and interquartile range for each column
+Q1 = penguins_clean['flipper_length_mm'].quantile(q=.25)
+Q3 = penguins_clean['flipper_length_mm'].quantile(q=.75)
+IQR = stats.iqr(penguins_clean['flipper_length_mm'])
+print(Q1,Q3, IQR)
+
+#only keep rows in dataframe that have values within 1.5*IQR of Q1 and Q3
+penguins_clean = df.dropna()
+penguins_clean = penguins_clean[~((penguins_clean['flipper_length_mm'] < (Q1-1.5*IQR)) | (penguins_clean['flipper_length_mm'] > (Q3+1.5*IQR)))]
+
+print(penguins_clean.info())
+```
+
 Since we are unsure of how many species of penguin are included in the data, we will be running an unsupervised machine learning model using K-means clustering to classify the penguins. To do so, the 'sex' feature must first be converted into dummy variables, and the features must be scaled to have a uniform scale.
 
 ```python
@@ -93,7 +109,52 @@ print(penguins_preprocessed.info())
 scaler=StandardScaler()
 penguins_preprocessed=scaler.fit_transform(penguins_preprocessed)
 ```
-Next, we must perform a Principal Component Analysis (PCA) of the features to identify components with an explained variance greater than 10% to reduce the dimensionality of the dataset and 
+Next, we must perform a Principal Component Analysis (PCA) of the features to identify components with an explained variance greater than 10% to reduce the dimensionality of the dataset.
+
+```python
+pca=PCA()
+df_pca=pca.fit(penguins_preprocessed)
+print(df_pca.explained_variance_ratio_)
+n_components=sum(df_pca.explained_variance_ratio_>.1)
+print(n_components)
+```
+
+We must then perform an elbow analysis of K-means clusters to identify the optimal K cluster value for categorization
+
+```python
+inertia=[]
+
+for i in range(1,10):
+    kmeans=KMeans(n_clusters= i, random_state=9)
+    kmeans.fit(penguins_pca)
+    inertia.append(kmeans.inertia_)
+    
+plt.plot(range(1, 10), inertia, marker='o')
+plt.xlabel('Number of clusters')
+plt.ylabel('Inertia')
+plt.title('Elbow Method')
+plt.show()
+```
+![image](https://github.com/RicardoGrayson/Clustering-Antarctic-Penguin-Species/assets/63846918/dfd5ea4a-11ba-419a-bfa5-788e2444cd27)
+
+Inertia begins to level out at 4 clusters, suggesting a K cluster value of 4. Using this value, perform K-Means clustering on the identified principal components
+
+```python
+n_clusters=4
+kmeans=KMeans(n_clusters=n_clusters,random_state=42).fit(penguins_pca)
+plt.scatter(penguins_pca[:,0],penguins_pca[:,1],c=kmeans.labels_)
+plt.xlabel('First Component')
+plt.ylabel('Second Component')
+plt.title(f'K-means Clustering (K={n_clusters})')
+plt.legend()
+plt.show()
+```
+
+![image](https://github.com/RicardoGrayson/Clustering-Antarctic-Penguin-Species/assets/63846918/491fb5b4-f1e4-4de0-b614-0aabcff56f76)
+
+The average stats for each category of penguiun
+![image](https://github.com/RicardoGrayson/Clustering-Antarctic-Penguin-Species/assets/63846918/216ef8e1-a688-41e7-997e-27715009d5b2)
+
 
 
 ### Results/Findings
@@ -106,28 +167,10 @@ The analysis results are summarized as follows:
 ### Recommendations
 
 Based on the analysis, we recommend the following actions:
-- Invest in marketing and promotions during peak sales seasons to maximize revenue.
-- Focus on expanding and promoting products in Category A.
-- Implement a customer segmentation strategy to target high-LTV customers effectively.
-
-### Limitations
-
-I had to remove all zero values from budget and revenue columns because they would have affected the accuracy of my conclusions from the analysis. There are still a few outliers even after the omissions but even then we can still see that there is a positive correlation between both budget and number of votes with revenue.
+- Reevaluate quantity of species endemic to the research site beyond the 3 previously identified species
+- Consider further adding additional features for measurement to potentially identify more clearly differentiated penguin groupings (age, height, coloration, etc).
 
 ### References
 
-1. SQL for Businesses by werty.
-2. [Stack Overflow](https://stack.com)
-
-
-
-|Heading1|Heading2|
-|--------|--------|
-|Content|Content2|
-|Python|SQL|
-
-`column_1`
-
-**bold**
-
-*italic*
+1. data source: @allison_horst https://github.com/allisonhorst/penguins
+2. IDE: https://jupyter.org/
